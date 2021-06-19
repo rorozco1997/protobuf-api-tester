@@ -1,24 +1,43 @@
 {
-  "name": "protobuf-api-tester",
-  "version": "1.0.0",
-  "description": "",
-  "main": "./build/main.js",
+  "name": "protobuf-api-tester-react",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@fluentui/react": "^8.17.3",
+    "@types/react-router-dom": "^5.1.7",
+    "protobufjs": "^6.11.2",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "react-router-dom": "^5.2.0",
+    "react-scripts": "4.0.3",
+    "web-vitals": "^1.0.1"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rorozco1997/protobuf-api-tester.git"
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/rorozco1997/protobuf-api-tester/issues"
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   },
-  "homepage": "https://github.com/rorozco1997/protobuf-api-tester#readme",
   "devDependencies": {
-    "typescript": "^4.3.2"
+    "@types/react": "^17.0.11",
+    "typescript": "^4.3.4"
   }
 }
