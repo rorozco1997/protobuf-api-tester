@@ -7,15 +7,22 @@ import {
   IDropdownOption,
 } from "@fluentui/react";
 
+import "./ProtoInteract.scss";
+
 export const ProtoInteract: React.FunctionComponent = () => {
+  const [packageMap, setPackageMap] = useState<Map<string, string[]>>(
+    new Map()
+  );
   const [packageList, setPackageList] = useState<IDropdownOption[]>([]);
   const [messageList, setMessageList] = useState<IDropdownOption[]>([]);
-  const [packageSelected, setPackageSelected] = useState<string>();
+  const [packageSelected, setPackageSelected] = useState<string>("");
   const [requestMessage, setRequestMessage] = useState<string>("");
   const [responseMessage, setResponseMessage] = useState<string>("");
   const [httpMethod, setHttpMethod] = useState<string>("");
   const [endpoint, setEndpoint] = useState<string>("");
   const [userJsonInput, setUserJsonInput] = useState<string>("");
+  const [responseCode, setResponseCode] = useState<string>("");
+  const [responseData, setResponseData] = useState<string>("");
 
   const httpMethods: IDropdownOption[] = [
     { key: "GET", text: "GET" },
@@ -24,22 +31,125 @@ export const ProtoInteract: React.FunctionComponent = () => {
 
   useEffect(() => {
     if (packageList.length === 0) {
-      setPackageList(
-        Object.keys(root.nested as any).map((pkg: string) => {
-          return { key: pkg, text: pkg };
+      const newPackageMap = new Map<string, string[]>();
+      const newPackageList: IDropdownOption[] = [];
+      function computeMapAndList(nextObj: any, packageNameAcc: string) {
+        if (!nextObj.nested) {
+          console.log("Shouldn't be possible?");
+          return;
+        }
+
+        const objKeys = Object.keys(nextObj.nested);
+
+        objKeys.forEach((objKey: string) => {
+          const nextDescriptor = nextObj.nested[objKey];
+
+          if (nextDescriptor.nested) {
+            computeMapAndList(
+              nextDescriptor,
+              packageNameAcc ? packageNameAcc + "." + objKey : objKey
+            );
+          } else {
+            if (newPackageMap.has(packageNameAcc)) {
+              const pkgMessages = newPackageMap.get(packageNameAcc);
+
+              if (!pkgMessages) {
+                throw new Error(
+                  "MASSIVE ERROR IN PKGMESSAGES. ABORT AND FIX BUG."
+                );
+              }
+
+              pkgMessages.push(objKey);
+              newPackageMap.set(packageNameAcc, pkgMessages);
+            } else {
+              newPackageList.push({
+                key: packageNameAcc,
+                text: packageNameAcc,
+              });
+              newPackageMap.set(packageNameAcc, [objKey]);
+            }
+          }
+        });
+      }
+
+      computeMapAndList(root, "");
+      setPackageList(newPackageList);
+      setPackageMap(newPackageMap);
+    }
+  }, [packageList]);
+
+  useEffect(() => {
+    if (packageSelected) {
+      const messageList = packageMap.get(packageSelected);
+
+      if (!messageList) {
+        throw new Error("Package counted but no messages!");
+      }
+
+      setMessageList(
+        messageList.map((messageName: string) => {
+          return { key: messageName, text: messageName };
         })
       );
     }
-  }, [packageList]);
+  }, [packageSelected, packageMap]);
 
   if (!root.nested) {
     alert("Protobuf import not successful. Closing");
     return <h1>Protobuf Import Failure. Restart script!</h1>;
   }
 
+  async function networkCall(
+    packageSelected: string,
+    requestMessage: string,
+    responseMessage: string,
+    httpMethod: string,
+    endpoint: string,
+    jsonData: string
+  ) {
+    try {
+      if (!root.nested) {
+        throw new Error("Protobuf failed");
+      }
+
+      let data;
+
+      if (jsonData) {
+        const jsonParsed = JSON.parse(jsonData);
+        const req = root.lookupType(`${packageSelected}.${requestMessage}`);
+        const message = req.create(jsonParsed);
+        data = req.encode(message).finish();
+      }
+
+      const response = await fetch(endpoint, {
+        method: httpMethod,
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+        mode: "cors",
+        body: data ? data : undefined,
+      });
+
+      if (responseMessage) {
+        const resp = root.lookupType(`${packageSelected}.${responseMessage}`);
+        const responseBody = await (await response.blob()).arrayBuffer();
+        const parsedResponse = resp.decode(new Uint8Array(responseBody));
+        setResponseData(JSON.stringify(parsedResponse.toJSON()));
+      }
+
+      setResponseCode(response.status.toString());
+    } catch (err) {
+      alert(`Error: ${err}. Please try again`);
+    }
+  }
+
   return (
-    <div>
+    <div className="protoInteract">
+      <h1 className="protoInteract__element">
+        Select Your Package and Messages
+      </h1>
       <Dropdown
+        className="protoInteract__element"
         placeholder="Select a detected package"
         label="Package Selection"
         options={packageList}
@@ -67,6 +177,7 @@ export const ProtoInteract: React.FunctionComponent = () => {
       {packageSelected && (
         <div>
           <Dropdown
+            className="protoInteract__element"
             placeholder="Select a message as your request type"
             label="Request Selection (if applicable)"
             options={messageList}
@@ -79,6 +190,7 @@ export const ProtoInteract: React.FunctionComponent = () => {
             }}
           />
           <Dropdown
+            className="protoInteract__element"
             placeholder="Select a message as your response type"
             label="Response Selection (if applicable)"
             options={messageList}
@@ -91,6 +203,7 @@ export const ProtoInteract: React.FunctionComponent = () => {
             }}
           />
           <Dropdown
+            className="protoInteract__element"
             placeholder="Select HTTP method"
             label="HTTP Method"
             options={httpMethods}
@@ -103,6 +216,7 @@ export const ProtoInteract: React.FunctionComponent = () => {
             }}
           />
           <TextField
+            className="protoInteract__element"
             label={"Enter Endpoint"}
             value={endpoint}
             onChange={(
@@ -113,6 +227,7 @@ export const ProtoInteract: React.FunctionComponent = () => {
             }}
           />
           <TextField
+            className="protoInteract__element"
             label={"Enter JSON data (if applicable)"}
             value={userJsonInput}
             onChange={(
@@ -123,6 +238,7 @@ export const ProtoInteract: React.FunctionComponent = () => {
             }}
           />
           <PrimaryButton
+            className="protoInteract__element"
             label="Execute"
             text="Execute"
             onClick={() => {
@@ -136,52 +252,28 @@ export const ProtoInteract: React.FunctionComponent = () => {
               );
             }}
           />
+          <hr />
+          {responseCode !== "" && (
+            <div>
+              <h1 className="protoInteract__element">Response Information</h1>
+              <TextField
+                className="protoInteract__element"
+                label="Response code"
+                readOnly
+                value={responseCode}
+              />
+              <TextField
+                className="protoInteract__element"
+                label="Response body"
+                readOnly
+                value={
+                  responseData ? responseData : "No response body available"
+                }
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
-
-async function networkCall(
-  packageSelected: string,
-  requestMessage: string,
-  responseMessage: string,
-  httpMethod: string,
-  endpoint: string,
-  jsonData: string
-) {
-  try {
-    if (!root.nested) {
-      throw new Error("Protobuf failed");
-    }
-
-    let data;
-
-    if (jsonData) {
-      const jsonParsed = JSON.parse(jsonData);
-      const req = root.lookupType(`${packageSelected}.${requestMessage}`);
-      const message = req.create(jsonParsed);
-      data = req.encode(message).finish();
-    }
-
-    const response = await fetch(endpoint, {
-      method: httpMethod,
-      headers: {
-        "Content-Type": "application/octet-stream",
-      },
-      mode: "no-cors",
-      body: data ? data : undefined,
-    });
-
-    alert("Response code: " + response.status);
-
-    if (responseMessage) {
-      const resp = root.lookupType(`${packageSelected}.${responseMessage}`);
-      const responseBody = await (await response.blob()).arrayBuffer();
-      const parsedResponse = resp.decode(new Uint8Array(responseBody));
-      alert("Response message: " + JSON.stringify(parsedResponse.toJSON()));
-    }
-  } catch (err) {
-    alert(`Error: ${err}. Please try again`);
-  }
-}
